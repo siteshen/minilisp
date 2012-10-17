@@ -19,3 +19,7 @@ Data *copy_data(Data *data);
 char *atom_to_string(Atom *atom);
 char *cons_to_string(Cons *cons);
 char *data_to_string(Data *data);
+
+Data *read_atom(char *str);
+Data *read_cons(char *str);
+Data *read_data(char *str);

@@ -1,14 +1,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <ctype.h>
 #include <string.h>
 
 #include "lisp.h"
+
+char *sub_str(char *str, int beg, int end) {
+  char *new_str;
+  if (beg >= end) return NULL;
+  new_str = malloc(end - beg + 1);
+  bzero(new_str, end - beg + 1);
+  strncpy(new_str, str + beg, end - beg);
+  return new_str;
+}
 
 /* empty_*: create empty struct */
 Atom *empty_atom() { Atom *atom = malloc(sizeof(Atom)); bzero(atom, sizeof(Atom)); return atom; }
 Cons *empty_cons() { Cons *cons = malloc(sizeof(Cons)); bzero(cons, sizeof(Cons)); return cons; }
 Data *empty_data() { Data *data = malloc(sizeof(Data)); bzero(data, sizeof(Data)); return data; }
+
 
 /* {{{ make atom/cons/data */
 /* make an atom */
@@ -34,6 +45,7 @@ Data *make_data(Type type, void *data) {
   return new_data;
 }
 /* }}} */
+
 
 /* {{{ copy  str/atom/cons/data */
 /* return a copy of str */
@@ -69,6 +81,7 @@ Data *copy_data(Data *data) {
 /* {{{ string  str/atom/cons/data */
 /* to string: atom, cons, data */
 char *atom_to_string(Atom *atom) {
+  if (!atom) return "";
   return atom->name;
 }
 
@@ -86,11 +99,11 @@ char *cons_to_string(Cons *cons) {
   new_str = malloc(str_len);
 
   bzero(new_str, str_len);
-  new_str[0] = '(';                             /* '(' */
-  strcpy(new_str + 1, car_str);                 /* car */
-  new_str[strlen(car_str) + 1] = ' ';           /* ' ' */
-  strcpy(new_str+strlen(car_str)+2, cdr_str);   /* cdr */
-  new_str[str_len - 2] = ')';                   /* ')' */
+  strcat(new_str, "(");
+  strcat(new_str, car_str);
+  strcat(new_str, " ");
+  strcat(new_str, cdr_str);
+  strcat(new_str, ")");
   return new_str;
 }
 
