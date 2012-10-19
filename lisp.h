@@ -1,6 +1,6 @@
 typedef enum   Type { ATOM, CONS } Type;
 typedef struct Atom { char *name; } Atom;
-typedef struct Cons { struct Data *car; struct Cons *cdr; } Cons;
+typedef struct Cons { struct Data *car; struct Data *cdr; } Cons;
 typedef struct Data { Type type; void *data; } Data;
 
 Atom *empty_atom();
@@ -8,7 +8,7 @@ Cons *empty_cons();
 Data *empty_data();
 
 Atom *make_atom(char *str);
-Cons *make_cons(Data *car, Cons *cdr);
+Cons *make_cons(Data *car, Data *cdr);
 Data *make_data(Type type, void *data);
 
 char *copy_str(char *str);

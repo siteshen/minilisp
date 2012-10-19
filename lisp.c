@@ -30,10 +30,10 @@ Atom *make_atom(char *str) {
 }
 
 /* make a cons */
-Cons *make_cons(Data *car, Cons *cdr) {
+Cons *make_cons(Data *car, Data *cdr) {
   Cons *cons = empty_cons();
   cons->car = copy_data(car);
-  cons->cdr = copy_cons(cdr);
+  cons->cdr = copy_data(cdr);
   return cons;
 }
 
@@ -94,7 +94,7 @@ char *cons_to_string(Cons *cons) {
   if (!cons) return "";
   if (!cons->car && !cons->cdr) return "()";
   car_str = data_to_string(cons->car);
-  cdr_str = cons_to_string(cons->cdr);
+  cdr_str = data_to_string(cons->cdr);
   str_len = strlen(car_str) + strlen(cdr_str) + 4;
   new_str = malloc(str_len);
 
@@ -123,8 +123,10 @@ int main(int argc, char *argv[]) {
   Atom *atom3 = make_atom("hello-linux");
   Data *data1 = make_data(ATOM, atom1);
   Data *data2 = make_data(ATOM, atom2);
+  Data *data3 = make_data(ATOM, atom3);
   Cons *cons1 = make_cons(data1, NULL);
-  Cons *cons2 = make_cons(data2, cons1);
+  Cons *cons2 = make_cons(data1, data2);
+  Cons *cons3 = make_cons(data2, data3);
 
   printf("%s\n", atom_to_string(atom1));
   printf("%s\n", atom_to_string(atom2));
@@ -132,5 +134,6 @@ int main(int argc, char *argv[]) {
   printf("%s\n", data_to_string(data1));
   printf("%s\n", cons_to_string(cons1));
   printf("%s\n", cons_to_string(cons2));
+  printf("%s\n", cons_to_string(cons3));
   return 0;
 }
