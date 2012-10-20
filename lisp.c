@@ -112,10 +112,107 @@ char *data_to_string(Data *data) {
   switch (data->type) {
   case ATOM: return atom_to_string((Atom *)(data->data));
   case CONS: return cons_to_string((Cons *)(data->data));
+  default  : return "";                         /* gcc warning */
   }
 }
 /* }}} */
 
+
+/* {{{ read atom/cons/data */
+static int read_from_string_index = 0;
+Data *read_atom(char *str, int beg) {
+  int atom_len = 0;
+  char *name = NULL;
+
+  while (isspace(str[beg])) beg++;
+  while (str[beg] && !isspace(str[beg]) && str[beg] != '(' && str[beg] != ')') {
+    beg++;
+    atom_len++;
+  }
+  name = sub_str(str, beg - atom_len, beg);
+  read_from_string_index = beg;
+  return make_data(ATOM, make_atom(name));
+}
+
+Data *read_cons(char *str, int beg) {
+  Data *car;
+  Data *cdr;
+
+  while (isspace(str[beg])) beg++;
+  car = read_from(str, beg + 1);
+  cdr = read_from(str, read_from_string_index);
+  return make_data(CONS, make_cons(car, cdr));
+}
+
+Data *read_from(char *str, int beg) {
+  while (isspace(str[beg])) beg++;
+  switch (str[beg]) {
+  case '(': return read_cons(str, beg);
+  case ')': return NULL;
+  default : return read_atom(str, beg);
+  }
+}
+
+Data *read_data(char *str) {
+  return read_from(str, 0);
+}
+/* }}} */
+
+Data *_read_(char *str) {
+  return read_data(str);
+}
+
+/* TODO: implement it */
+Data *_eval_(Data *data) {
+  return data;
+}
+
+Data *_cons_(Data *car, Data *cdr) {
+  Cons *cons = make_cons(_eval_(car), _eval_(cdr));
+  return make_data(CONS, cons);
+}
+
+Data *_car_(Data *data) {
+  data = _eval_(data);
+  if (!data) return NULL;
+  switch (data->type) {
+  case ATOM: return NULL;
+  case CONS: return ((Cons *)(data->data))->car;
+  default  : return NULL;                       /* gcc warning */
+  }
+}
+
+Data *_cdr_(Data *data) {
+  data = _eval_(data);
+  if (!data) return NULL;
+  switch (data->type) {
+  case ATOM: return NULL;
+  case CONS: return ((Cons *)(data->data))->cdr;
+  default  : return NULL;                       /* gcc warning */
+  }
+}
+
+Data *_quote_(Data *data) {
+  return data;
+}
+
+Data *_if_(Data *if_, Data *then_, Data *else_) {
+  return _eval_(if_) ? _eval_(then_) : _eval_(else_);
+}
+
+int _atom_(Data *data) {
+  data = _eval_(data);
+  if (!data) return 1;
+  switch (data->type) {
+  case ATOM: return !strcmp(data_to_string(data), "NIL");
+  case CONS: return !strcmp(data_to_string(data), "( )");
+  default  : return 0;                          /* gcc warning */
+  }
+}
+
+int _eq_(Data *d1, Data *d2) {
+  return _eval_(d1) == _eval_(d2);
+}
 
 int main(int argc, char *argv[]) {
   Atom *atom1 = make_atom("hello-world");
@@ -134,6 +231,19 @@ int main(int argc, char *argv[]) {
   printf("%s\n", data_to_string(data1));
   printf("%s\n", cons_to_string(cons1));
   printf("%s\n", cons_to_string(cons2));
-  printf("%s\n", cons_to_string(cons3));
+
+  printf("\n==================== expr beg ====================\n");
+  printf("cons: %s\n", data_to_string(_cons_(data2, data3)));
+  printf("car: %s\n", data_to_string(_car_(make_data(CONS, cons3))));
+  printf("cdr: %s\n", data_to_string(_cdr_(make_data(CONS, cons3))));
+  printf("quote: %s\n", data_to_string(_quote_(make_data(CONS, cons3))));
+  printf("eq: %d\n", (_eq_(make_data(ATOM, make_atom("hello")),
+                           make_data(ATOM, make_atom("hello")))));
+  /* printf("(read 'hello'): %s\n", data_to_string(read_data("hello"))); */
+  /* printf("index: %d\n", read_from_string_index); */
+  printf("read('hello'): %s\n", data_to_string(_read_("hello")));
+  printf("read('(hello)'): %s\n", data_to_string(_read_("(hello)")));
+  printf("read('(hello world)'): %s\n", data_to_string(_read_("(hello world)")));
+  printf("\n==================== expr end ====================\n");
   return 0;
 }
