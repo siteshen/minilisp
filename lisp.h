@@ -33,3 +33,5 @@ Data *_quote_(Data *data);
 Data *_if_(Data *_if, Data *_then, Data *_else);
 int _atom_(Data *data);
 int _eq_(Data *d1, Data *d2);
+
+Data *_assoc_(Data *key, Data *pair);

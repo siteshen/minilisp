@@ -156,24 +156,19 @@ Data *read_from(char *str, int beg) {
 Data *read_data(char *str) {
   return read_from(str, 0);
 }
+
+static Data *env = NULL;
+Data *eval(Data *data, Cons *env) {
+  return NULL;
+}
 /* }}} */
 
-Data *_read_(char *str) {
-  return read_data(str);
-}
-
-/* TODO: implement it */
-Data *_eval_(Data *data) {
-  return data;
-}
-
 Data *_cons_(Data *car, Data *cdr) {
-  Cons *cons = make_cons(_eval_(car), _eval_(cdr));
+  Cons *cons = make_cons(car, cdr);
   return make_data(CONS, cons);
 }
 
 Data *_car_(Data *data) {
-  data = _eval_(data);
   if (!data) return NULL;
   switch (data->type) {
   case ATOM: return NULL;
@@ -183,7 +178,6 @@ Data *_car_(Data *data) {
 }
 
 Data *_cdr_(Data *data) {
-  data = _eval_(data);
   if (!data) return NULL;
   switch (data->type) {
   case ATOM: return NULL;
@@ -197,24 +191,69 @@ Data *_quote_(Data *data) {
 }
 
 Data *_if_(Data *if_, Data *then_, Data *else_) {
-  return _eval_(if_) ? _eval_(then_) : _eval_(else_);
+  return (if_) ? (then_) : (else_);
 }
 
 int _atom_(Data *data) {
-  data = _eval_(data);
   if (!data) return 1;
   switch (data->type) {
-  case ATOM: return !strcmp(data_to_string(data), "NIL");
+  case ATOM: return 1;
   case CONS: return !strcmp(data_to_string(data), "( )");
   default  : return 0;                          /* gcc warning */
   }
 }
 
 int _eq_(Data *d1, Data *d2) {
-  return _eval_(d1) == _eval_(d2);
+  return !strcmp(data_to_string(d1), data_to_string(d2));
 }
 
-int main(int argc, char *argv[]) {
+Data *_read_(char *str) {
+  return read_data(str);
+}
+
+/* TODO: implement it */
+Data *_eval_(Data *data) {
+  Data *car;
+  Data *cdr;
+  char *car_str;
+
+  if (!data) return NULL;
+
+  switch (data->type) {
+  case ATOM: return _assoc_(data, env);
+  case CONS:
+    car = _car_(data);
+    cdr = _cdr_(data);
+
+    if (_atom_(car)) {
+      car_str = data_to_string(car);
+      if (!strcmp(car_str, "quote")) {
+        return _quote_(data);
+      } else if (!strcmp(car_str, "car")) {
+        return _car_(_eval_(cdr));
+      } else if (!strcmp(car_str, "cdr")) {
+        return _cdr_(_eval_(cdr));
+      }
+    }
+    return data;
+  default  : return data;
+  }
+}
+
+Data *_assoc_(Data *key, Data *pair) {
+  Data *car;
+  Data *cdr;
+  if (!pair) return NULL;
+  car = _car_(pair);
+  cdr = _cdr_(pair);
+  if (_eq_(_car_(car), key)) {
+    return _cdr_(car);
+  } else {
+    return _assoc_(key, _cdr_(pair));
+  }
+}
+
+void test() {
   Atom *atom1 = make_atom("hello-world");
   Atom *atom2 = make_atom("hello-emacs");
   Atom *atom3 = make_atom("hello-linux");
@@ -245,5 +284,45 @@ int main(int argc, char *argv[]) {
   printf("read('(hello)'): %s\n", data_to_string(_read_("(hello)")));
   printf("read('(hello world)'): %s\n", data_to_string(_read_("(hello world)")));
   printf("\n==================== expr end ====================\n");
+}
+
+/* init env with some testing data ... */
+void init_env() {
+  char *keys [] = { "os",  "editor", "who"   };
+  char *vals [] = { "mac", "emacs",  "xshen" };
+  Atom *key;
+  Atom *val;
+  Data *pair;
+  int i = 0;
+
+  for (i = 0; i < 3; ++i) {
+    key = make_atom(keys[i]);
+    val = make_atom(vals[i]);
+    pair = _cons_(make_data(ATOM, key), make_data(ATOM, val));
+    env = _cons_(pair, env);
+  }
+}
+
+void repl() {
+  char str[256];
+  Data *data;
+  Data *value;
+  init_env();
+
+  while (1) {
+    printf("env  : %s\n", data_to_string(env));
+    printf("lisp > ");
+    gets(str);
+    /* printf("=== I: %s\n", str); */
+    data = _read_(str);
+    /* printf("=== O: %s\n", data_to_string(data)); */
+    value = _eval_(data);
+    printf("=== V: %s\n", data_to_string(value));
+  }
+}
+
+int main(int argc, char *argv[]) {
+  printf("read('(hello world emacs)'): %s\n", data_to_string(_read_("(hello world emacs)")));
+  /* repl(); */
   return 0;
 }
