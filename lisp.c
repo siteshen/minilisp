@@ -81,29 +81,39 @@ Data *copy_data(Data *data) {
 /* {{{ string  str/atom/cons/data */
 /* to string: atom, cons, data */
 char *atom_to_string(Atom *atom) {
-  if (!atom) return "";
+  if (!atom) return "nil";
   return atom->name;
 }
 
-char *cons_to_string(Cons *cons) {
+char *cons_to_string(Cons *cons, int racket) {
   char *car_str;
   char *cdr_str;
   int str_len;
   char *new_str;
 
-  if (!cons) return "";
-  if (!cons->car && !cons->cdr) return "()";
+  if (!cons) return "nil";
   car_str = data_to_string(cons->car);
-  cdr_str = data_to_string(cons->cdr);
-  str_len = strlen(car_str) + strlen(cdr_str) + 4;
+  if (!cons->cdr) return car_str;
+  if (cons->cdr->type == ATOM) {
+    cdr_str = atom_to_string((Atom *)(cons->cdr->data));
+  } else {
+    cdr_str = cons_to_string((Cons *)(cons->cdr->data), 0);
+  }
+  str_len = strlen(car_str) + strlen(cdr_str) + 6;
   new_str = malloc(str_len);
 
   bzero(new_str, str_len);
-  strcat(new_str, "(");
+  if (racket) strcat(new_str, "(");
   strcat(new_str, car_str);
-  strcat(new_str, " ");
-  strcat(new_str, cdr_str);
-  strcat(new_str, ")");
+  if (strcmp(cdr_str, "nil")) {
+    if (cons->cdr->type == ATOM) {
+      strcat(new_str, " . ");
+    } else if (cons->cdr->type == CONS) {
+      strcat(new_str, " ");
+    }
+    strcat(new_str, cdr_str);
+  }
+  if (racket) strcat(new_str, ")");
   return new_str;
 }
 
@@ -111,7 +121,7 @@ char *data_to_string(Data *data) {
   if (!data) return "";
   switch (data->type) {
   case ATOM: return atom_to_string((Atom *)(data->data));
-  case CONS: return cons_to_string((Cons *)(data->data));
+  case CONS: return cons_to_string((Cons *)(data->data), 1);
   default  : return "";                         /* gcc warning */
   }
 }
@@ -139,15 +149,20 @@ Data *read_cons(char *str, int beg) {
   Data *cdr;
 
   while (isspace(str[beg])) beg++;
-  car = read_from(str, beg + 1);
-  cdr = read_from(str, read_from_string_index);
+  if (str[beg] == ')') {
+    read_from_string_index++;
+    return empty_data();
+  }
+  if (str[beg] == '.') return read_atom(str, beg + 1);
+  car = read_from(str, beg);
+  cdr = read_cons(str, read_from_string_index);
   return make_data(CONS, make_cons(car, cdr));
 }
 
 Data *read_from(char *str, int beg) {
   while (isspace(str[beg])) beg++;
   switch (str[beg]) {
-  case '(': return read_cons(str, beg);
+  case '(': return read_cons(str, beg + 1);
   case ')': return NULL;
   default : return read_atom(str, beg);
   }
@@ -228,11 +243,14 @@ Data *_eval_(Data *data) {
     if (_atom_(car)) {
       car_str = data_to_string(car);
       if (!strcmp(car_str, "quote")) {
-        return _quote_(data);
+        return _quote_(_car_(cdr));
       } else if (!strcmp(car_str, "car")) {
-        return _car_(_eval_(cdr));
+        return _car_(_eval_(_car_(cdr)));
       } else if (!strcmp(car_str, "cdr")) {
-        return _cdr_(_eval_(cdr));
+        return _cdr_(_eval_(_car_(cdr)));
+      } else if (!strcmp(car_str, "cons")) {
+        return _cons_(_eval_(_car_(cdr)),
+                      _eval_(_car_(_cdr_(cdr))));
       }
     }
     return data;
@@ -268,8 +286,8 @@ void test() {
   printf("%s\n", atom_to_string(atom2));
   printf("%s\n", atom_to_string(atom3));
   printf("%s\n", data_to_string(data1));
-  printf("%s\n", cons_to_string(cons1));
-  printf("%s\n", cons_to_string(cons2));
+  printf("%s\n", cons_to_string(cons1, 1));
+  printf("%s\n", cons_to_string(cons2, 1));
 
   printf("\n==================== expr beg ====================\n");
   printf("cons: %s\n", data_to_string(_cons_(data2, data3)));
@@ -322,7 +340,18 @@ void repl() {
 }
 
 int main(int argc, char *argv[]) {
-  printf("read('(hello world emacs)'): %s\n", data_to_string(_read_("(hello world emacs)")));
-  /* repl(); */
+  int i;
+  char *str[] = {
+    "hello", "(hello)", "((hello))",
+    "(a b)", "(a (b))", "((a) b)", "((a) (b))",
+    "(a b c)", "((a) b c)", "(a (b) c)", "((a) b c)", "((a) (b) (c))",
+    "((a b) c)", "(a (b c))"
+  };
+  i = 5;
+  for (i = 0; i < 14; i++) {
+    /* printf("read(\"%s\") => %s\n", str[i], data_to_string(_read_(str[i]))); */
+  }
+
+  repl();
   return 0;
 }

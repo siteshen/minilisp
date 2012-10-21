@@ -17,7 +17,7 @@ Cons *copy_cons(Cons *cons);
 Data *copy_data(Data *data);
 
 char *atom_to_string(Atom *atom);
-char *cons_to_string(Cons *cons);
+char *cons_to_string(Cons *cons, int racket);
 char *data_to_string(Data *data);
 
 Data *read_atom(char *str, int beg);
