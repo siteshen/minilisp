@@ -160,10 +160,19 @@ Data *read_cons(char *str, int beg) {
 }
 
 Data *read_from(char *str, int beg) {
+  Data *quote = make_data(ATOM, make_atom("quote"));
+
   while (isspace(str[beg])) beg++;
   switch (str[beg]) {
-  case '(': return read_cons(str, beg + 1);
-  case ')': return NULL;
+  case '(':
+    read_from_string_index++;
+    return read_cons(str, beg + 1);
+  case '\'':
+    read_from_string_index++;
+    return make_data(CONS, make_cons(quote, _cons_(read_from(str, beg + 1), empty_data())));
+  case ')':
+    read_from_string_index++;
+    return NULL;
   default : return read_atom(str, beg);
   }
 }
@@ -339,6 +348,11 @@ void repl() {
   }
 }
 
+void read_print(char *str) {
+  Data *data = _read_(str);
+  printf("read: \"%s\" => %s\n", str, data_to_string(data));
+}
+
 int main(int argc, char *argv[]) {
   int i;
   char *str[] = {
@@ -352,6 +366,9 @@ int main(int argc, char *argv[]) {
     /* printf("read(\"%s\") => %s\n", str[i], data_to_string(_read_(str[i]))); */
   }
 
+  /* read_print("who"); */
+  /* read_print("'who"); */
+  /* read_print("'(who)"); */
   repl();
   return 0;
 }
