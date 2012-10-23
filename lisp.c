@@ -23,18 +23,18 @@ Data *empty_data() { Data *data = malloc(sizeof(Data)); bzero(data, sizeof(Data)
 
 /* {{{ make atom/cons/data */
 /* make an atom */
-Atom *make_atom(char *str) {
+Data *make_atom(char *str) {
   Atom *atom = empty_atom();
   atom->name = copy_str(str);
-  return atom;
+  return make_data(ATOM, atom);
 }
 
 /* make a cons */
-Cons *make_cons(Data *car, Data *cdr) {
+Data *make_cons(Data *car, Data *cdr) {
   Cons *cons = empty_cons();
   cons->car = copy_data(car);
   cons->cdr = copy_data(cdr);
-  return cons;
+  return make_data(CONS, cons);
 }
 
 /* make a data */
@@ -141,7 +141,7 @@ Data *read_atom(char *str, int beg) {
   }
   name = sub_str(str, beg - atom_len, beg);
   read_from_string_index = beg;
-  return make_data(ATOM, make_atom(name));
+  return make_atom(name);
 }
 
 Data *read_cons(char *str, int beg) {
@@ -156,11 +156,11 @@ Data *read_cons(char *str, int beg) {
   if (str[beg] == '.') return read_atom(str, beg + 1);
   car = read_from(str, beg);
   cdr = read_cons(str, read_from_string_index);
-  return make_data(CONS, make_cons(car, cdr));
+  return make_cons(car, cdr);
 }
 
 Data *read_from(char *str, int beg) {
-  Data *quote = make_data(ATOM, make_atom("quote"));
+  Data *quote = make_atom("quote");
 
   while (isspace(str[beg])) beg++;
   switch (str[beg]) {
@@ -169,7 +169,7 @@ Data *read_from(char *str, int beg) {
     return read_cons(str, beg + 1);
   case '\'':
     read_from_string_index++;
-    return make_data(CONS, make_cons(quote, _cons_(read_from(str, beg + 1), empty_data())));
+    return make_cons(quote, make_cons(read_from(str, beg + 1), empty_data()));
   case ')':
     read_from_string_index++;
     return NULL;
@@ -188,8 +188,7 @@ Data *eval(Data *data, Cons *env) {
 /* }}} */
 
 Data *_cons_(Data *car, Data *cdr) {
-  Cons *cons = make_cons(car, cdr);
-  return make_data(CONS, cons);
+  return make_cons(car, cdr);
 }
 
 Data *_car_(Data *data) {
@@ -218,17 +217,17 @@ Data *_if_(Data *if_, Data *then_, Data *else_) {
   return (if_) ? (then_) : (else_);
 }
 
-int _atom_(Data *data) {
-  if (!data) return 1;
+Data *_atom_(Data *data) {
+  if (!data) return Qt;
   switch (data->type) {
-  case ATOM: return 1;
-  case CONS: return !strcmp(data_to_string(data), "( )");
-  default  : return 0;                          /* gcc warning */
+  case ATOM: return Qt;
+  case CONS: return _eq_(data, Qt);
+  default  : return Qnil;                       /* gcc warning */
   }
 }
 
-int _eq_(Data *d1, Data *d2) {
-  return !strcmp(data_to_string(d1), data_to_string(d2));
+Data *_eq_(Data *d1, Data *d2) {
+  return !strcmp(data_to_string(d1), data_to_string(d2)) ? Qt : Qnil;
 }
 
 Data *_read_(char *str) {
@@ -280,52 +279,23 @@ Data *_assoc_(Data *key, Data *pair) {
   }
 }
 
-void test() {
-  Atom *atom1 = make_atom("hello-world");
-  Atom *atom2 = make_atom("hello-emacs");
-  Atom *atom3 = make_atom("hello-linux");
-  Data *data1 = make_data(ATOM, atom1);
-  Data *data2 = make_data(ATOM, atom2);
-  Data *data3 = make_data(ATOM, atom3);
-  Cons *cons1 = make_cons(data1, NULL);
-  Cons *cons2 = make_cons(data1, data2);
-  Cons *cons3 = make_cons(data2, data3);
-
-  printf("%s\n", atom_to_string(atom1));
-  printf("%s\n", atom_to_string(atom2));
-  printf("%s\n", atom_to_string(atom3));
-  printf("%s\n", data_to_string(data1));
-  printf("%s\n", cons_to_string(cons1, 1));
-  printf("%s\n", cons_to_string(cons2, 1));
-
-  printf("\n==================== expr beg ====================\n");
-  printf("cons: %s\n", data_to_string(_cons_(data2, data3)));
-  printf("car: %s\n", data_to_string(_car_(make_data(CONS, cons3))));
-  printf("cdr: %s\n", data_to_string(_cdr_(make_data(CONS, cons3))));
-  printf("quote: %s\n", data_to_string(_quote_(make_data(CONS, cons3))));
-  printf("eq: %d\n", (_eq_(make_data(ATOM, make_atom("hello")),
-                           make_data(ATOM, make_atom("hello")))));
-  /* printf("(read 'hello'): %s\n", data_to_string(read_data("hello"))); */
-  /* printf("index: %d\n", read_from_string_index); */
-  printf("read('hello'): %s\n", data_to_string(_read_("hello")));
-  printf("read('(hello)'): %s\n", data_to_string(_read_("(hello)")));
-  printf("read('(hello world)'): %s\n", data_to_string(_read_("(hello world)")));
-  printf("\n==================== expr end ====================\n");
-}
-
 /* init env with some testing data ... */
 void init_env() {
   char *keys [] = { "os",  "editor", "who"   };
   char *vals [] = { "mac", "emacs",  "xshen" };
-  Atom *key;
-  Atom *val;
+  Data *key;
+  Data *val;
   Data *pair;
   int i = 0;
+
+  Qnil = NULL;
+  Qt = make_atom("t");
+  Qquote = make_atom("quote");
 
   for (i = 0; i < 3; ++i) {
     key = make_atom(keys[i]);
     val = make_atom(vals[i]);
-    pair = _cons_(make_data(ATOM, key), make_data(ATOM, val));
+    pair = _cons_(key, val);
     env = _cons_(pair, env);
   }
 }

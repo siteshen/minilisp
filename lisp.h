@@ -7,8 +7,8 @@ Atom *empty_atom();
 Cons *empty_cons();
 Data *empty_data();
 
-Atom *make_atom(char *str);
-Cons *make_cons(Data *car, Data *cdr);
+Data *make_atom(char *str);
+Data *make_cons(Data *car, Data *cdr);
 Data *make_data(Type type, void *data);
 
 char *copy_str(char *str);
@@ -31,7 +31,9 @@ Data *_car_(Data *data);
 Data *_cdr_(Data *data);
 Data *_quote_(Data *data);
 Data *_if_(Data *_if, Data *_then, Data *_else);
-int _atom_(Data *data);
-int _eq_(Data *d1, Data *d2);
+Data *_atom_(Data *data);
+Data *_eq_(Data *d1, Data *d2);
 
 Data *_assoc_(Data *key, Data *pair);
+
+static Data *Qnil, *Qt, *Qquote;
