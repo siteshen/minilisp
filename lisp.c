@@ -238,6 +238,7 @@ Data *_read_(char *str) {
 Data *_eval_(Data *data) {
   Data *car;
   Data *cdr;
+  Data *key, *val;
   char *car_str;
 
   if (!data) return NULL;
@@ -252,6 +253,11 @@ Data *_eval_(Data *data) {
       car_str = data_to_string(car);
       if (!strcmp(car_str, "quote")) {
         return _quote_(_car_(cdr));
+      } else if (!strcmp(car_str, "def")) {
+        key = _car_(cdr);
+        val = _eval_(_car_(_cdr_(cdr)));
+        env = _cons_(_cons_(key, val), env);
+        return _quote_(key);
       } else if (!strcmp(car_str, "car")) {
         return _car_(_eval_(_car_(cdr)));
       } else if (!strcmp(car_str, "cdr")) {
