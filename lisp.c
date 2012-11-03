@@ -118,11 +118,11 @@ char *cons_to_string(Cons *cons, int racket) {
 }
 
 char *data_to_string(Data *data) {
-  if (!data) return "";
+  if (!data) return "nil";
   switch (data->type) {
   case ATOM: return atom_to_string((Atom *)(data->data));
   case CONS: return cons_to_string((Cons *)(data->data), 1);
-  default  : return "";                         /* gcc warning */
+  default  : return "nil";                      /* gcc warning */
   }
 }
 /* }}} */
@@ -150,7 +150,8 @@ Data *read_cons(char *str, int beg) {
 
   while (isspace(str[beg])) beg++;
   if (str[beg] == ')') {
-    read_from_string_index++;
+    beg++;
+    read_from_string_index = beg;
     return empty_data();
   }
   if (str[beg] == '.') return read_atom(str, beg + 1);
@@ -160,8 +161,6 @@ Data *read_cons(char *str, int beg) {
 }
 
 Data *read_from(char *str, int beg) {
-  Data *quote = make_atom("quote");
-
   while (isspace(str[beg])) beg++;
   switch (str[beg]) {
   case '(':
@@ -169,10 +168,10 @@ Data *read_from(char *str, int beg) {
     return read_cons(str, beg + 1);
   case '\'':
     read_from_string_index++;
-    return make_cons(quote, make_cons(read_from(str, beg + 1), empty_data()));
+    return make_cons(Qquote, make_cons(read_from(str, beg + 1), empty_data()));
   case ')':
     read_from_string_index++;
-    return NULL;
+    return Qnil;
   default : return read_atom(str, beg);
   }
 }
@@ -192,20 +191,20 @@ Data *_cons_(Data *car, Data *cdr) {
 }
 
 Data *_car_(Data *data) {
-  if (!data) return NULL;
+  if (!data) return Qnil;
   switch (data->type) {
-  case ATOM: return NULL;
+  case ATOM: return Qnil;
   case CONS: return ((Cons *)(data->data))->car;
-  default  : return NULL;                       /* gcc warning */
+  default  : return Qnil;                       /* gcc warning */
   }
 }
 
 Data *_cdr_(Data *data) {
-  if (!data) return NULL;
+  if (!data) return Qnil;
   switch (data->type) {
-  case ATOM: return NULL;
+  case ATOM: return Qnil;
   case CONS: return ((Cons *)(data->data))->cdr;
-  default  : return NULL;                       /* gcc warning */
+  default  : return Qnil;                       /* gcc warning */
   }
 }
 
@@ -213,12 +212,8 @@ Data *_quote_(Data *data) {
   return data;
 }
 
-int _nil_(Data *data) {
-  return !(data && data->type == ATOM && !strcmp(data_to_string(data), "nil"));
-}
-
 Data *_if_(Data *if_, Data *then_, Data *else_) {
-  return _nil_(if_) ? (then_) : (else_);
+  return NILP(if_) ? (then_) : (else_);
 }
 
 Data *_atom_(Data *data) {
@@ -238,6 +233,20 @@ Data *_read_(char *str) {
   return read_data(str);
 }
 
+int NILP(Data *data) {
+  return !(data && data->type == ATOM && !strcmp(data_to_string(data), "nil"));
+}
+
+int LAMBDAP(Data *data) {
+  char *car_str;
+
+  if (data && data->type == CONS) {
+    car_str = data_to_string(_car_(data));
+    return (!strcmp(car_str, "lambda"));
+  }
+  return 0;
+}
+
 /* TODO: implement it */
 Data *_eval_(Data *data) {
   Data *car;
@@ -245,7 +254,7 @@ Data *_eval_(Data *data) {
   Data *key, *val;
   char *car_str;
 
-  if (!data) return NULL;
+  if (!data) return Qnil;
 
   switch (data->type) {
   case ATOM: return _assoc_(data, env);
@@ -277,6 +286,9 @@ Data *_eval_(Data *data) {
         val = _eval_(_car_(_cdr_(cdr)));
         env = _cons_(_cons_(key, val), env);
         return _quote_(key);
+      } else if (!strcmp(car_str, "lambda")) {
+        return _quote_(data);
+      } else if (!LAMBDAP(_eval_(car))) {
       }
     }
     return data;
@@ -287,7 +299,7 @@ Data *_eval_(Data *data) {
 Data *_assoc_(Data *key, Data *pair) {
   Data *car;
   Data *cdr;
-  if (!pair) return NULL;
+  if (!pair) return Qnil;
   car = _car_(pair);
   cdr = _cdr_(pair);
   if (_eq_(_car_(car), key)) {
@@ -322,7 +334,6 @@ void repl() {
   char str[256];
   Data *data;
   Data *value;
-  init_env();
 
   while (1) {
     printf("env  : %s\n", data_to_string(env));
@@ -354,9 +365,14 @@ int main(int argc, char *argv[]) {
     /* printf("read(\"%s\") => %s\n", str[i], data_to_string(_read_(str[i]))); */
   }
 
+  init_env();
   /* read_print("who"); */
   /* read_print("'who"); */
   /* read_print("'(who)"); */
+  /* read_print("(car () 'a)"); */
+  /* read_print("(car nil 'a)"); */
+  /* read_print("(cons () 't)"); */
+  /* read_print("(lambda () 'a)"); */
   repl();
   return 0;
 }

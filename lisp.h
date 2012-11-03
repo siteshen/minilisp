@@ -37,3 +37,6 @@ Data *_eq_(Data *d1, Data *d2);
 Data *_assoc_(Data *key, Data *pair);
 
 static Data *Qnil, *Qt, *Qquote;
+
+int NILP(Data *data);
+int LAMBDAP(Data *data);
