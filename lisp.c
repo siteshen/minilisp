@@ -213,8 +213,12 @@ Data *_quote_(Data *data) {
   return data;
 }
 
+int _nil_(Data *data) {
+  return !(data && data->type == ATOM && !strcmp(data_to_string(data), "nil"));
+}
+
 Data *_if_(Data *if_, Data *then_, Data *else_) {
-  return (if_) ? (then_) : (else_);
+  return _nil_(if_) ? (then_) : (else_);
 }
 
 Data *_atom_(Data *data) {
@@ -253,11 +257,10 @@ Data *_eval_(Data *data) {
       car_str = data_to_string(car);
       if (!strcmp(car_str, "quote")) {
         return _quote_(_car_(cdr));
-      } else if (!strcmp(car_str, "def")) {
-        key = _car_(cdr);
-        val = _eval_(_car_(_cdr_(cdr)));
-        env = _cons_(_cons_(key, val), env);
-        return _quote_(key);
+      } else if (!strcmp(car_str, "atom")) {
+        return _atom_(_eval_(_car_(cdr)));
+      } else if (!strcmp(car_str, "eq")) {
+        return _eq_(_eval_(_car_(cdr)), _eval_(_car_(_cdr_(cdr))));
       } else if (!strcmp(car_str, "car")) {
         return _car_(_eval_(_car_(cdr)));
       } else if (!strcmp(car_str, "cdr")) {
@@ -265,6 +268,15 @@ Data *_eval_(Data *data) {
       } else if (!strcmp(car_str, "cons")) {
         return _cons_(_eval_(_car_(cdr)),
                       _eval_(_car_(_cdr_(cdr))));
+      } else if (!strcmp(car_str, "if")) {
+        return _if_(_car_(cdr),
+                    _eval_(_car_(_cdr_(cdr))),
+                    _eval_(_car_(_cdr_(_cdr_(cdr)))));
+      } else if (!strcmp(car_str, "def")) {
+        key = _car_(cdr);
+        val = _eval_(_car_(_cdr_(cdr)));
+        env = _cons_(_cons_(key, val), env);
+        return _quote_(key);
       }
     }
     return data;
@@ -294,7 +306,7 @@ void init_env() {
   Data *pair;
   int i = 0;
 
-  Qnil = NULL;
+  Qnil = make_atom("nil");
   Qt = make_atom("t");
   Qquote = make_atom("quote");
 
