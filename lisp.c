@@ -213,7 +213,7 @@ Data *_quote_(Data *data) {
 }
 
 Data *_if_(Data *if_, Data *then_, Data *else_) {
-  return NILP(if_) ? (then_) : (else_);
+  return !NILP(if_) ? (then_) : (else_);
 }
 
 Data *_atom_(Data *data) {
@@ -234,7 +234,7 @@ Data *_read_(char *str) {
 }
 
 int NILP(Data *data) {
-  return !(data && data->type == ATOM && !strcmp(data_to_string(data), "nil"));
+  return (data && data->type == ATOM && !strcmp(data_to_string(data), "nil"));
 }
 
 int LAMBDAP(Data *data) {
@@ -247,11 +247,20 @@ int LAMBDAP(Data *data) {
   return 0;
 }
 
+Data * _nth_(int n, Data *data) {
+  while (n > 0 && !NILP(data)) {
+    data = _cdr_(data);
+    n--;
+  }
+  return _car_(data);
+}
+
 /* TODO: implement it */
 Data *_eval_(Data *data) {
   Data *car;
   Data *cdr;
   Data *key, *val;
+  Data *lambda;
   char *car_str;
 
   if (!data) return Qnil;
@@ -288,7 +297,13 @@ Data *_eval_(Data *data) {
         return _quote_(key);
       } else if (!strcmp(car_str, "lambda")) {
         return _quote_(data);
-      } else if (!LAMBDAP(_eval_(car))) {
+      } else if (LAMBDAP(_eval_(car))) {
+        lambda = (_eval_(car));
+        arg_list = (_nth_(1, lambda));
+      } else if (!strcmp(car_str, "read")) {
+        return _read_(data_to_string(_car_(cdr)));
+      } else if (!strcmp(car_str, "eval")) {
+        return _eval_((_car_(cdr)));
       }
     }
     return data;

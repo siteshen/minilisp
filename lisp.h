@@ -40,3 +40,11 @@ static Data *Qnil, *Qt, *Qquote;
 
 int NILP(Data *data);
 int LAMBDAP(Data *data);
+
+enum Lisp_Type {
+  Lisp_Cons,
+  Lisp_Object,
+  Lisp_Number,
+  Lisp_Symbol,
+  Lisp_String,
+};
