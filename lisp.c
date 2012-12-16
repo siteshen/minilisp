@@ -18,36 +18,36 @@ char *sub_str(char *str, int beg, int end) {
 /* empty_*: create empty struct */
 Atom *empty_atom() { Atom *atom = malloc(sizeof(Atom)); bzero(atom, sizeof(Atom)); return atom; }
 Cons *empty_cons() { Cons *cons = malloc(sizeof(Cons)); bzero(cons, sizeof(Cons)); return cons; }
-Data *empty_data() { Data *data = malloc(sizeof(Data)); bzero(data, sizeof(Data)); return data; }
+Sexp *empty_sexp() { Sexp *sexp = malloc(sizeof(Sexp)); bzero(sexp, sizeof(Sexp)); return sexp; }
 
 
-/* {{{ make atom/cons/data */
+/* {{{ make atom/cons/sexp */
 /* make an atom */
-Data *make_atom(char *str) {
+Sexp *make_atom(char *str) {
   Atom *atom = empty_atom();
   atom->name = copy_str(str);
-  return make_data(ATOM, atom);
+  return make_sexp(ATOM, atom);
 }
 
 /* make a cons */
-Data *make_cons(Data *car, Data *cdr) {
+Sexp *make_cons(Sexp *car, Sexp *cdr) {
   Cons *cons = empty_cons();
-  cons->car = copy_data(car);
-  cons->cdr = copy_data(cdr);
-  return make_data(CONS, cons);
+  cons->car = copy_sexp(car);
+  cons->cdr = copy_sexp(cdr);
+  return make_sexp(CONS, cons);
 }
 
-/* make a data */
-Data *make_data(Type type, void *data) {
-  Data *new_data = empty_data();
-  new_data->type = type;
-  new_data->data = data;
-  return new_data;
+/* make a sexp */
+Sexp *make_sexp(Type type, void *sexp) {
+  Sexp *new_sexp = empty_sexp();
+  new_sexp->type = type;
+  new_sexp->sexp = sexp;
+  return new_sexp;
 }
 /* }}} */
 
 
-/* {{{ copy  str/atom/cons/data */
+/* {{{ copy  str/atom/cons/sexp */
 /* return a copy of str */
 char *copy_str(char *str) {
   char *new_str = malloc(strlen(str) + 1);
@@ -69,17 +69,17 @@ Cons *copy_cons(Cons *cons) {
   return new_cons;
 }
 
-/* return a copy of data */
-Data *copy_data(Data *data) {
-  Data *new_data = empty_data();
-  if (data) memcpy(new_data, data, sizeof(Data));
-  return new_data;
+/* return a copy of sexp */
+Sexp *copy_sexp(Sexp *sexp) {
+  Sexp *new_sexp = empty_sexp();
+  if (sexp) memcpy(new_sexp, sexp, sizeof(Sexp));
+  return new_sexp;
 }
 /* }}} */
 
 
-/* {{{ string  str/atom/cons/data */
-/* to string: atom, cons, data */
+/* {{{ string  str/atom/cons/sexp */
+/* to string: atom, cons, sexp */
 char *atom_to_string(Atom *atom) {
   if (!atom) return "nil";
   return atom->name;
@@ -92,12 +92,12 @@ char *cons_to_string(Cons *cons, int racket) {
   char *new_str;
 
   if (!cons) return "nil";
-  car_str = data_to_string(cons->car);
+  car_str = sexp_to_string(cons->car);
   if (!cons->cdr) return car_str;
   if (cons->cdr->type == ATOM) {
-    cdr_str = atom_to_string((Atom *)(cons->cdr->data));
+    cdr_str = atom_to_string((Atom *)(cons->cdr->sexp));
   } else {
-    cdr_str = cons_to_string((Cons *)(cons->cdr->data), 0);
+    cdr_str = cons_to_string((Cons *)(cons->cdr->sexp), 0);
   }
   str_len = strlen(car_str) + strlen(cdr_str) + 6;
   new_str = malloc(str_len);
@@ -117,20 +117,20 @@ char *cons_to_string(Cons *cons, int racket) {
   return new_str;
 }
 
-char *data_to_string(Data *data) {
-  if (!data) return "nil";
-  switch (data->type) {
-  case ATOM: return atom_to_string((Atom *)(data->data));
-  case CONS: return cons_to_string((Cons *)(data->data), 1);
+char *sexp_to_string(Sexp *sexp) {
+  if (!sexp) return "nil";
+  switch (sexp->type) {
+  case ATOM: return atom_to_string((Atom *)(sexp->sexp));
+  case CONS: return cons_to_string((Cons *)(sexp->sexp), 1);
   default  : return "nil";                      /* gcc warning */
   }
 }
 /* }}} */
 
 
-/* {{{ read atom/cons/data */
+/* {{{ read atom/cons/sexp */
 static int read_from_string_index = 0;
-Data *read_atom(char *str, int beg) {
+Sexp *read_atom(char *str, int beg) {
   int atom_len = 0;
   char *name = NULL;
 
@@ -144,15 +144,15 @@ Data *read_atom(char *str, int beg) {
   return make_atom(name);
 }
 
-Data *read_cons(char *str, int beg) {
-  Data *car;
-  Data *cdr;
+Sexp *read_cons(char *str, int beg) {
+  Sexp *car;
+  Sexp *cdr;
 
   while (isspace(str[beg])) beg++;
   if (str[beg] == ')') {
     beg++;
     read_from_string_index = beg;
-    return empty_data();
+    return empty_sexp();
   }
   if (str[beg] == '.') return read_atom(str, beg + 1);
   car = read_from(str, beg);
@@ -160,7 +160,7 @@ Data *read_cons(char *str, int beg) {
   return make_cons(car, cdr);
 }
 
-Data *read_from(char *str, int beg) {
+Sexp *read_from(char *str, int beg) {
   while (isspace(str[beg])) beg++;
   switch (str[beg]) {
   case '(':
@@ -168,7 +168,7 @@ Data *read_from(char *str, int beg) {
     return read_cons(str, beg + 1);
   case '\'':
     read_from_string_index++;
-    return make_cons(Qquote, make_cons(read_from(str, beg + 1), empty_data()));
+    return make_cons(Qquote, make_cons(read_from(str, beg + 1), empty_sexp()));
   case ')':
     read_from_string_index++;
     return Qnil;
@@ -176,103 +176,103 @@ Data *read_from(char *str, int beg) {
   }
 }
 
-Data *read_data(char *str) {
+Sexp *read_sexp(char *str) {
   return read_from(str, 0);
 }
 
-static Data *env = NULL;
-Data *eval(Data *data, Cons *env) {
+static Sexp *env = NULL;
+Sexp *eval(Sexp *sexp, Cons *env) {
   return NULL;
 }
 /* }}} */
 
-Data *_cons_(Data *car, Data *cdr) {
+Sexp *_cons_(Sexp *car, Sexp *cdr) {
   return make_cons(car, cdr);
 }
 
-Data *_car_(Data *data) {
-  if (!data) return Qnil;
-  switch (data->type) {
+Sexp *_car_(Sexp *sexp) {
+  if (!sexp) return Qnil;
+  switch (sexp->type) {
   case ATOM: return Qnil;
-  case CONS: return ((Cons *)(data->data))->car;
+  case CONS: return ((Cons *)(sexp->sexp))->car;
   default  : return Qnil;                       /* gcc warning */
   }
 }
 
-Data *_cdr_(Data *data) {
-  if (!data) return Qnil;
-  switch (data->type) {
+Sexp *_cdr_(Sexp *sexp) {
+  if (!sexp) return Qnil;
+  switch (sexp->type) {
   case ATOM: return Qnil;
-  case CONS: return ((Cons *)(data->data))->cdr;
+  case CONS: return ((Cons *)(sexp->sexp))->cdr;
   default  : return Qnil;                       /* gcc warning */
   }
 }
 
-Data *_quote_(Data *data) {
-  return data;
+Sexp *_quote_(Sexp *sexp) {
+  return sexp;
 }
 
-Data *_if_(Data *if_, Data *then_, Data *else_) {
+Sexp *_if_(Sexp *if_, Sexp *then_, Sexp *else_) {
   return !NILP(if_) ? (then_) : (else_);
 }
 
-Data *_atom_(Data *data) {
-  if (!data) return Qt;
-  switch (data->type) {
+Sexp *_atom_(Sexp *sexp) {
+  if (!sexp) return Qt;
+  switch (sexp->type) {
   case ATOM: return Qt;
-  case CONS: return _eq_(data, Qt);
+  case CONS: return _eq_(sexp, Qt);
   default  : return Qnil;                       /* gcc warning */
   }
 }
 
-Data *_eq_(Data *d1, Data *d2) {
-  return !strcmp(data_to_string(d1), data_to_string(d2)) ? Qt : Qnil;
+Sexp *_eq_(Sexp *d1, Sexp *d2) {
+  return !strcmp(sexp_to_string(d1), sexp_to_string(d2)) ? Qt : Qnil;
 }
 
-Data *_read_(char *str) {
-  return read_data(str);
+Sexp *_read_(char *str) {
+  return read_sexp(str);
 }
 
-int NILP(Data *data) {
-  return (data && data->type == ATOM && !strcmp(data_to_string(data), "nil"));
+int NILP(Sexp *sexp) {
+  return (sexp && sexp->type == ATOM && !strcmp(sexp_to_string(sexp), "nil"));
 }
 
-int LAMBDAP(Data *data) {
+int LAMBDAP(Sexp *sexp) {
   char *car_str;
 
-  if (data && data->type == CONS) {
-    car_str = data_to_string(_car_(data));
+  if (sexp && sexp->type == CONS) {
+    car_str = sexp_to_string(_car_(sexp));
     return (!strcmp(car_str, "lambda"));
   }
   return 0;
 }
 
-Data * _nth_(int n, Data *data) {
-  while (n > 0 && !NILP(data)) {
-    data = _cdr_(data);
+Sexp * _nth_(int n, Sexp *sexp) {
+  while (n > 0 && !NILP(sexp)) {
+    sexp = _cdr_(sexp);
     n--;
   }
-  return _car_(data);
+  return _car_(sexp);
 }
 
 /* TODO: implement it */
-Data *_eval_(Data *data) {
-  Data *car;
-  Data *cdr;
-  Data *key, *val;
-  Data *lambda;
+Sexp *_eval_(Sexp *sexp) {
+  Sexp *car;
+  Sexp *cdr;
+  Sexp *key, *val;
+  Sexp *lambda;
   char *car_str;
 
-  if (!data) return Qnil;
+  if (!sexp) return Qnil;
 
-  switch (data->type) {
-  case ATOM: return _assoc_(data, env);
+  switch (sexp->type) {
+  case ATOM: return _assoc_(sexp, env);
   case CONS:
-    car = _car_(data);
-    cdr = _cdr_(data);
+    car = _car_(sexp);
+    cdr = _cdr_(sexp);
 
     if (_atom_(car)) {
-      car_str = data_to_string(car);
+      car_str = sexp_to_string(car);
       if (!strcmp(car_str, "quote")) {
         return _quote_(_car_(cdr));
       } else if (!strcmp(car_str, "atom")) {
@@ -296,24 +296,24 @@ Data *_eval_(Data *data) {
         env = _cons_(_cons_(key, val), env);
         return _quote_(key);
       } else if (!strcmp(car_str, "lambda")) {
-        return _quote_(data);
+        return _quote_(sexp);
       } else if (LAMBDAP(_eval_(car))) {
         lambda = (_eval_(car));
-        arg_list = (_nth_(1, lambda));
+        /* arg_list = (_nth_(1, lambda)); */
       } else if (!strcmp(car_str, "read")) {
-        return _read_(data_to_string(_car_(cdr)));
+        return _read_(sexp_to_string(_car_(cdr)));
       } else if (!strcmp(car_str, "eval")) {
         return _eval_((_car_(cdr)));
       }
     }
-    return data;
-  default  : return data;
+    return sexp;
+  default  : return sexp;
   }
 }
 
-Data *_assoc_(Data *key, Data *pair) {
-  Data *car;
-  Data *cdr;
+Sexp *_assoc_(Sexp *key, Sexp *pair) {
+  Sexp *car;
+  Sexp *cdr;
   if (!pair) return Qnil;
   car = _car_(pair);
   cdr = _cdr_(pair);
@@ -324,13 +324,13 @@ Data *_assoc_(Data *key, Data *pair) {
   }
 }
 
-/* init env with some testing data ... */
+/* init env with some testing sexp ... */
 void init_env() {
   char *keys [] = { "os",  "editor", "who"   };
   char *vals [] = { "mac", "emacs",  "xshen" };
-  Data *key;
-  Data *val;
-  Data *pair;
+  Sexp *key;
+  Sexp *val;
+  Sexp *pair;
   int i = 0;
 
   Qnil = make_atom("nil");
@@ -347,24 +347,24 @@ void init_env() {
 
 void repl() {
   char str[256];
-  Data *data;
-  Data *value;
+  Sexp *sexp;
+  Sexp *value;
 
   while (1) {
-    printf("env  : %s\n", data_to_string(env));
+    printf("env  : %s\n", sexp_to_string(env));
     printf("lisp > ");
     gets(str);
     /* printf("=== I: %s\n", str); */
-    data = _read_(str);
-    /* printf("=== O: %s\n", data_to_string(data)); */
-    value = _eval_(data);
-    printf("=== V: %s\n", data_to_string(value));
+    sexp = _read_(str);
+    /* printf("=== O: %s\n", sexp_to_string(sexp)); */
+    value = _eval_(sexp);
+    printf("=== V: %s\n", sexp_to_string(value));
   }
 }
 
 void read_print(char *str) {
-  Data *data = _read_(str);
-  printf("read: \"%s\" => %s\n", str, data_to_string(data));
+  Sexp *sexp = _read_(str);
+  printf("read: \"%s\" => %s\n", str, sexp_to_string(sexp));
 }
 
 int main(int argc, char *argv[]) {
@@ -377,7 +377,7 @@ int main(int argc, char *argv[]) {
   };
   i = 5;
   for (i = 0; i < 14; i++) {
-    /* printf("read(\"%s\") => %s\n", str[i], data_to_string(_read_(str[i]))); */
+    /* printf("read(\"%s\") => %s\n", str[i], sexp_to_string(_read_(str[i]))); */
   }
 
   init_env();

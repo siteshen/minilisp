@@ -1,50 +1,49 @@
-typedef enum   Type { ATOM, CONS } Type;
-typedef struct Atom { char *name; } Atom;
-typedef struct Cons { struct Data *car; struct Data *cdr; } Cons;
-typedef struct Data { Type type; void *data; } Data;
+#ifndef _LISP_H_
+#define _LISP_H_
+
+
+typedef enum   { ATOM, CONS, } Type;
+typedef struct { char *name; } Atom;
+typedef struct { Type type; void *sexp; } Sexp;
+typedef struct { Sexp *car; Sexp *cdr;  } Cons;
 
 Atom *empty_atom();
 Cons *empty_cons();
-Data *empty_data();
+Sexp *empty_sexp();
 
-Data *make_atom(char *str);
-Data *make_cons(Data *car, Data *cdr);
-Data *make_data(Type type, void *data);
+Sexp *make_atom(char *str);
+Sexp *make_cons(Sexp *car, Sexp *cdr);
+Sexp *make_sexp(Type type, void *sexp);
 
 char *copy_str(char *str);
 Atom *copy_atom(Atom *atom);
 Cons *copy_cons(Cons *cons);
-Data *copy_data(Data *data);
+Sexp *copy_sexp(Sexp *sexp);
 
 char *atom_to_string(Atom *atom);
 char *cons_to_string(Cons *cons, int racket);
-char *data_to_string(Data *data);
+char *sexp_to_string(Sexp *sexp);
 
-Data *read_atom(char *str, int beg);
-Data *read_cons(char *str, int beg);
-Data *read_from(char *str, int beg);
-Data *read_data(char *str);
+Sexp *read_atom(char *str, int beg);
+Sexp *read_cons(char *str, int beg);
+Sexp *read_from(char *str, int beg);
+Sexp *read_sexp(char *str);
 
-Data *_eval_(Data *data);
-Data *_cons_(Data *car, Data *cdr);
-Data *_car_(Data *data);
-Data *_cdr_(Data *data);
-Data *_quote_(Data *data);
-Data *_if_(Data *_if, Data *_then, Data *_else);
-Data *_atom_(Data *data);
-Data *_eq_(Data *d1, Data *d2);
+Sexp *_eval_(Sexp *sexp);
+Sexp *_cons_(Sexp *car, Sexp *cdr);
+Sexp *_car_(Sexp *sexp);
+Sexp *_cdr_(Sexp *sexp);
+Sexp *_quote_(Sexp *sexp);
+Sexp *_if_(Sexp *_if, Sexp *_then, Sexp *_else);
+Sexp *_atom_(Sexp *sexp);
+Sexp *_eq_(Sexp *d1, Sexp *d2);
 
-Data *_assoc_(Data *key, Data *pair);
+Sexp *_assoc_(Sexp *key, Sexp *pair);
 
-static Data *Qnil, *Qt, *Qquote;
+static Sexp *Qnil, *Qt, *Qquote;
 
-int NILP(Data *data);
-int LAMBDAP(Data *data);
+int NILP(Sexp *sexp);
+int LAMBDAP(Sexp *sexp);
 
-enum Lisp_Type {
-  Lisp_Cons,
-  Lisp_Object,
-  Lisp_Number,
-  Lisp_Symbol,
-  Lisp_String,
-};
+
+#endif /* _LISP_H_ */
