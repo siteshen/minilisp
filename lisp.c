@@ -6,6 +6,10 @@
 
 #include "lisp.h"
 
+void print(Sexp *sexp) {
+  printf("%s\n", sexp_to_string(sexp));
+}
+
 char *sub_str(char *str, int beg, int end) {
   char *new_str;
   if (beg >= end) return NULL;
@@ -181,8 +185,8 @@ Sexp *read_sexp(char *str) {
 }
 
 static Sexp *env = NULL;
-Sexp *eval(Sexp *sexp, Cons *env) {
-  return NULL;
+Sexp *_eval_(Sexp *sexp) {
+  return eval(sexp, env);
 }
 /* }}} */
 
@@ -239,7 +243,6 @@ int NILP(Sexp *sexp) {
 
 int LAMBDAP(Sexp *sexp) {
   char *car_str;
-
   if (sexp && sexp->type == CONS) {
     car_str = sexp_to_string(_car_(sexp));
     return (!strcmp(car_str, "lambda"));
@@ -256,17 +259,19 @@ Sexp * _nth_(int n, Sexp *sexp) {
 }
 
 /* TODO: implement it */
-Sexp *_eval_(Sexp *sexp) {
+Sexp *eval(Sexp *sexp, Sexp *local_env) {
   Sexp *car;
   Sexp *cdr;
   Sexp *key, *val;
   Sexp *lambda;
+  Sexp *arg_list;
+  Sexp *val_list;
   char *car_str;
 
   if (!sexp) return Qnil;
 
   switch (sexp->type) {
-  case ATOM: return _assoc_(sexp, env);
+  case ATOM: return _assoc_(sexp, local_env);
   case CONS:
     car = _car_(sexp);
     cdr = _cdr_(sexp);
@@ -276,34 +281,34 @@ Sexp *_eval_(Sexp *sexp) {
       if (!strcmp(car_str, "quote")) {
         return _quote_(_car_(cdr));
       } else if (!strcmp(car_str, "atom")) {
-        return _atom_(_eval_(_car_(cdr)));
+        return _atom_(eval(_car_(cdr), local_env));
       } else if (!strcmp(car_str, "eq")) {
-        return _eq_(_eval_(_car_(cdr)), _eval_(_car_(_cdr_(cdr))));
+        return _eq_(eval(_car_(cdr), local_env),
+                    eval(_car_(_cdr_(cdr)), local_env));
       } else if (!strcmp(car_str, "car")) {
-        return _car_(_eval_(_car_(cdr)));
+        return _car_(eval(_car_(cdr), local_env));
       } else if (!strcmp(car_str, "cdr")) {
-        return _cdr_(_eval_(_car_(cdr)));
+        return _cdr_(eval(_car_(cdr), local_env));
       } else if (!strcmp(car_str, "cons")) {
-        return _cons_(_eval_(_car_(cdr)),
-                      _eval_(_car_(_cdr_(cdr))));
+        return _cons_(eval(_car_(cdr), local_env),
+                      eval(_car_(_cdr_(cdr)), local_env));
       } else if (!strcmp(car_str, "if")) {
         return _if_(_car_(cdr),
-                    _eval_(_car_(_cdr_(cdr))),
-                    _eval_(_car_(_cdr_(_cdr_(cdr)))));
+                    eval(_car_(_cdr_(cdr)), local_env),
+                    eval(_car_(_cdr_(_cdr_(cdr))), local_env));
       } else if (!strcmp(car_str, "def")) {
         key = _car_(cdr);
-        val = _eval_(_car_(_cdr_(cdr)));
+        val = eval(_car_(_cdr_(cdr)), local_env);
         env = _cons_(_cons_(key, val), env);
         return _quote_(key);
       } else if (!strcmp(car_str, "lambda")) {
-        return _quote_(sexp);
-      } else if (LAMBDAP(_eval_(car))) {
-        lambda = (_eval_(car));
-        /* arg_list = (_nth_(1, lambda)); */
+        return sexp;
+      } else if (LAMBDAP(car)) {
+        return fn_call(car, cdr);
       } else if (!strcmp(car_str, "read")) {
         return _read_(sexp_to_string(_car_(cdr)));
       } else if (!strcmp(car_str, "eval")) {
-        return _eval_((_car_(cdr)));
+        return eval(_car_(cdr), local_env);
       }
     }
     return sexp;
@@ -311,13 +316,31 @@ Sexp *_eval_(Sexp *sexp) {
   }
 }
 
+/* ((lambda (x y) (+ x y)) 12 34) */
+Sexp *fn_call(Sexp *fn, Sexp *args) {
+  Sexp *local_env = copy_sexp(env);
+  Sexp *arg_list = (_nth_(1, fn));
+  Sexp *val_list = args;
+  Sexp *body_list = _car_(_cdr_(_cdr_(fn)));
+  Sexp *car1, *cdr1, *car2, *cdr2;
+  do {
+    car1 = _car_(arg_list);
+    cdr1 = _cdr_(arg_list);
+    car2 = _car_(val_list);
+    cdr2 = _cdr_(val_list);
+    printf("==================== local_env before: "); print(local_env);
+    local_env = _cons_(_cons_(car1, _eval_(car2)), local_env);
+    printf("==================== local_env after:  "); print(local_env);
+
+  } while (!NILP(cdr1) && !NILP(cdr2));
+  return eval(body_list, local_env);
+}
+
 Sexp *_assoc_(Sexp *key, Sexp *pair) {
-  Sexp *car;
-  Sexp *cdr;
-  if (!pair) return Qnil;
-  car = _car_(pair);
-  cdr = _cdr_(pair);
-  if (_eq_(_car_(car), key)) {
+  Sexp *car = _car_(pair);
+  Sexp *cdr = _cdr_(pair);
+  if (NILP(pair)) return Qunbound;
+  if (!NILP(_eq_(_car_(car), key))) {
     return _cdr_(car);
   } else {
     return _assoc_(key, _cdr_(pair));
@@ -333,6 +356,7 @@ void init_env() {
   Sexp *pair;
   int i = 0;
 
+  Qunbound = make_atom("unbound");
   Qnil = make_atom("nil");
   Qt = make_atom("t");
   Qquote = make_atom("quote");
@@ -358,7 +382,7 @@ void repl() {
     sexp = _read_(str);
     /* printf("=== O: %s\n", sexp_to_string(sexp)); */
     value = _eval_(sexp);
-    printf("=== V: %s\n", sexp_to_string(value));
+    printf("=== Value: %s\n", sexp_to_string(value));
   }
 }
 
