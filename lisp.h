@@ -39,6 +39,7 @@ Sexp *_atom_(Sexp *sexp);
 Sexp *_eq_(Sexp *d1, Sexp *d2);
 
 Sexp *fn_call(Sexp *fn, Sexp *args);
+Sexp *_macroexpand_(Sexp *fn, Sexp *args);
 Sexp *eval(Sexp *sexp, Sexp *env);
 Sexp *_assoc_(Sexp *key, Sexp *pair);
 

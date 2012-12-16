@@ -250,6 +250,15 @@ int LAMBDAP(Sexp *sexp) {
   return 0;
 }
 
+int MACROP(Sexp *sexp) {
+  char *car_str;
+  if (sexp && sexp->type == CONS) {
+    car_str = sexp_to_string(_car_(sexp));
+    return (!strcmp(car_str, "macro"));
+  }
+  return 0;
+}
+
 Sexp * _nth_(int n, Sexp *sexp) {
   while (n > 0 && !NILP(sexp)) {
     sexp = _cdr_(sexp);
@@ -305,7 +314,17 @@ Sexp *eval(Sexp *sexp, Sexp *local_env) {
         return sexp;
       } else if (LAMBDAP(car)) {
         return fn_call(car, cdr);
-      } else if (!strcmp(car_str, "read")) {
+      } else if (!strcmp(car_str, "macro")) {
+        return sexp;
+      } else if (!strcmp(car_str, "macroexpand")) {
+        cdr = eval(_car_(cdr), local_env);
+        return _macroexpand_(_car_(cdr), _cdr_(cdr));
+      } else if (MACROP(car)) {
+        Sexp *expand = _macroexpand_(car, cdr);
+        printf("macro expand as: %s\n", sexp_to_string(expand));
+        return eval(expand, local_env);
+      }
+      else if (!strcmp(car_str, "read")) {
         return _read_(sexp_to_string(_car_(cdr)));
       } else if (!strcmp(car_str, "eval")) {
         return eval(_car_(cdr), local_env);
@@ -336,9 +355,30 @@ Sexp *fn_call(Sexp *fn, Sexp *args) {
   return eval(body_list, local_env);
 }
 
+Sexp *_macroexpand_(Sexp *macro, Sexp *args) {
+  Sexp *local_env = copy_sexp(env);
+  Sexp *arg_list = (_nth_(1, macro));
+  Sexp *val_list = args;
+  Sexp *body_list = _car_(_cdr_(_cdr_(macro)));
+  Sexp *car1, *cdr1, *car2, *cdr2;
+  do {
+    car1 = _car_(arg_list);
+    cdr1 = _cdr_(arg_list);
+    car2 = _car_(val_list);
+    cdr2 = _cdr_(val_list);
+    printf("==================== local_env before: "); print(local_env);
+    local_env = _cons_(_cons_(car1, car2), local_env);
+    printf("==================== local_env after:  "); print(local_env);
+
+  } while (!NILP(cdr1) && !NILP(cdr2));
+  printf("body_list: "); print(body_list);
+  return eval(body_list, local_env);
+}
+
 Sexp *_assoc_(Sexp *key, Sexp *pair) {
   Sexp *car = _car_(pair);
   Sexp *cdr = _cdr_(pair);
+  if (NILP(key))  return Qnil;
   if (NILP(pair)) return Qunbound;
   if (!NILP(_eq_(_car_(car), key))) {
     return _cdr_(car);
