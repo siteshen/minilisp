@@ -2,7 +2,7 @@
 #define _LISP_H_
 
 
-typedef enum   { ATOM, CONS, } Type;
+typedef enum   { ATOM, CONS, SUBR } Type;
 typedef struct { char *name; } Atom;
 typedef struct { Type type; void *sexp; } Sexp;
 typedef struct { Sexp *car; Sexp *cdr;  } Cons;
@@ -48,6 +48,54 @@ static Sexp *Qnil, *Qt, *Qquote, *Qunbound;
 
 int NILP(Sexp *sexp);
 int LAMBDAP(Sexp *sexp);
+
+
+typedef Sexp *Lisp_Object;
+
+typedef struct {
+  union {
+    Lisp_Object (*a0) (void);
+    Lisp_Object (*a1) (Lisp_Object);
+    Lisp_Object (*a2) (Lisp_Object, Lisp_Object);
+    Lisp_Object (*a3) (Lisp_Object, Lisp_Object, Lisp_Object);
+    Lisp_Object (*a4) (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
+    Lisp_Object (*a5) (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object,
+                       Lisp_Object);
+    Lisp_Object (*a6) (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object,
+                       Lisp_Object, Lisp_Object);
+    Lisp_Object (*a7) (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object,
+                       Lisp_Object, Lisp_Object, Lisp_Object);
+    Lisp_Object (*a8) (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object,
+                       Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
+  } function;
+  short min_args, max_args;
+  const char *symbol_name;
+} Subr;
+
+/* Note that the weird token-substitution semantics of ANSI C makes
+   this work for MANY and UNEVALLED.  */
+#define DEFUN_ARGS_MANY   (ptrdiff_t, Lisp_Object *)
+#define DEFUN_ARGS_UNEVALLED  (Lisp_Object)
+#define DEFUN_ARGS_0  (void)
+#define DEFUN_ARGS_1  (Lisp_Object)
+#define DEFUN_ARGS_2  (Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_3  (Lisp_Object, Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_4  (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_5  (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
+                       Lisp_Object)
+#define DEFUN_ARGS_6  (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
+                       Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_7  (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
+                       Lisp_Object, Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_8  (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
+                       Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
+
+#define DEFUN(name, minargs, maxargs)           \
+  Lisp_Object F##name DEFUN_ARGS_ ## maxargs;   \
+  static Subr S##name =                         \
+    { { .a ## maxargs = F##name },              \
+      minargs, maxargs, #name};                 \
+  Lisp_Object F##name
 
 
 #endif /* _LISP_H_ */

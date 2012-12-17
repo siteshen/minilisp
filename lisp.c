@@ -6,9 +6,7 @@
 
 #include "lisp.h"
 
-void print(Sexp *sexp) {
-  printf("%s\n", sexp_to_string(sexp));
-}
+#define PRINT(sexp) printf("[sexp]: %s\n", sexp_to_string(sexp));
 
 char *sub_str(char *str, int beg, int end) {
   char *new_str;
@@ -190,11 +188,11 @@ Sexp *_eval_(Sexp *sexp) {
 }
 /* }}} */
 
-Sexp *_cons_(Sexp *car, Sexp *cdr) {
+DEFUN (cons, 2, 2) (Lisp_Object car, Lisp_Object cdr) {
   return make_cons(car, cdr);
 }
 
-Sexp *_car_(Sexp *sexp) {
+DEFUN (car, 1, 1) (Lisp_Object sexp) {
   if (!sexp) return Qnil;
   switch (sexp->type) {
   case ATOM: return Qnil;
@@ -203,7 +201,7 @@ Sexp *_car_(Sexp *sexp) {
   }
 }
 
-Sexp *_cdr_(Sexp *sexp) {
+DEFUN (cdr, 1, 1) (Lisp_Object sexp) {
   if (!sexp) return Qnil;
   switch (sexp->type) {
   case ATOM: return Qnil;
@@ -212,29 +210,37 @@ Sexp *_cdr_(Sexp *sexp) {
   }
 }
 
-Sexp *_quote_(Sexp *sexp) {
+DEFUN (quote, 1, 1) (Lisp_Object sexp) {
   return sexp;
 }
 
-Sexp *_if_(Sexp *if_, Sexp *then_, Sexp *else_) {
+DEFUN (_if, 2, 3) (Lisp_Object if_, Lisp_Object then_, Lisp_Object else_) {
   return !NILP(if_) ? (then_) : (else_);
 }
 
-Sexp *_atom_(Sexp *sexp) {
+DEFUN (eq, 2, 2) (Lisp_Object d1, Lisp_Object d2) {
+  return !strcmp(sexp_to_string(d1), sexp_to_string(d2)) ? Qt : Qnil;
+}
+
+DEFUN (atom, 1, 1) (Lisp_Object sexp) {
   if (!sexp) return Qt;
   switch (sexp->type) {
   case ATOM: return Qt;
-  case CONS: return _eq_(sexp, Qt);
+  case CONS: return Feq(sexp, Qt);
   default  : return Qnil;                       /* gcc warning */
   }
 }
 
-Sexp *_eq_(Sexp *d1, Sexp *d2) {
-  return !strcmp(sexp_to_string(d1), sexp_to_string(d2)) ? Qt : Qnil;
-}
-
 Sexp *_read_(char *str) {
   return read_sexp(str);
+}
+
+Sexp *_nth_(int n, Lisp_Object sexp) {
+  while (n > 0 && !NILP(sexp)) {
+    sexp = Fcdr(sexp);
+    n--;
+  }
+  return Fcar(sexp);
 }
 
 int NILP(Sexp *sexp) {
@@ -244,7 +250,7 @@ int NILP(Sexp *sexp) {
 int LAMBDAP(Sexp *sexp) {
   char *car_str;
   if (sexp && sexp->type == CONS) {
-    car_str = sexp_to_string(_car_(sexp));
+    car_str = sexp_to_string(Fcar(sexp));
     return (!strcmp(car_str, "lambda"));
   }
   return 0;
@@ -253,18 +259,10 @@ int LAMBDAP(Sexp *sexp) {
 int MACROP(Sexp *sexp) {
   char *car_str;
   if (sexp && sexp->type == CONS) {
-    car_str = sexp_to_string(_car_(sexp));
+    car_str = sexp_to_string(Fcar(sexp));
     return (!strcmp(car_str, "macro"));
   }
   return 0;
-}
-
-Sexp * _nth_(int n, Sexp *sexp) {
-  while (n > 0 && !NILP(sexp)) {
-    sexp = _cdr_(sexp);
-    n--;
-  }
-  return _car_(sexp);
 }
 
 /* TODO: implement it */
@@ -282,34 +280,34 @@ Sexp *eval(Sexp *sexp, Sexp *local_env) {
   switch (sexp->type) {
   case ATOM: return _assoc_(sexp, local_env);
   case CONS:
-    car = _car_(sexp);
-    cdr = _cdr_(sexp);
+    car = Fcar(sexp);
+    cdr = Fcdr(sexp);
 
-    if (_atom_(car)) {
+    if (Fatom(car)) {
       car_str = sexp_to_string(car);
       if (!strcmp(car_str, "quote")) {
-        return _quote_(_car_(cdr));
+        return Fcar(cdr);
       } else if (!strcmp(car_str, "atom")) {
-        return _atom_(eval(_car_(cdr), local_env));
+        return Fatom(eval(Fcar(cdr), local_env));
       } else if (!strcmp(car_str, "eq")) {
-        return _eq_(eval(_car_(cdr), local_env),
-                    eval(_car_(_cdr_(cdr)), local_env));
+        return Feq(eval(Fcar(cdr), local_env),
+                   eval(Fcar(Fcdr(cdr)), local_env));
       } else if (!strcmp(car_str, "car")) {
-        return _car_(eval(_car_(cdr), local_env));
+        return Fcar(eval(Fcar(cdr), local_env));
       } else if (!strcmp(car_str, "cdr")) {
-        return _cdr_(eval(_car_(cdr), local_env));
+        return Fcdr(eval(Fcar(cdr), local_env));
       } else if (!strcmp(car_str, "cons")) {
-        return _cons_(eval(_car_(cdr), local_env),
-                      eval(_car_(_cdr_(cdr)), local_env));
+        return Fcons(eval(Fcar(cdr), local_env),
+                     eval(Fcar(Fcdr(cdr)), local_env));
       } else if (!strcmp(car_str, "if")) {
-        return _if_(_car_(cdr),
-                    eval(_car_(_cdr_(cdr)), local_env),
-                    eval(_car_(_cdr_(_cdr_(cdr))), local_env));
+        return F_if(Fcar(cdr),
+                    eval(Fcar(Fcdr(cdr)), local_env),
+                    eval(Fcar(Fcdr(Fcdr(cdr))), local_env));
       } else if (!strcmp(car_str, "def")) {
-        key = _car_(cdr);
-        val = eval(_car_(_cdr_(cdr)), local_env);
-        env = _cons_(_cons_(key, val), env);
-        return _quote_(key);
+        key = Fcar(cdr);
+        val = eval(Fcar(Fcdr(cdr)), local_env);
+        env = Fcons(Fcons(key, val), env);
+        return key;
       } else if (!strcmp(car_str, "lambda")) {
         return sexp;
       } else if (LAMBDAP(car)) {
@@ -317,17 +315,17 @@ Sexp *eval(Sexp *sexp, Sexp *local_env) {
       } else if (!strcmp(car_str, "macro")) {
         return sexp;
       } else if (!strcmp(car_str, "macroexpand")) {
-        cdr = eval(_car_(cdr), local_env);
-        return _macroexpand_(_car_(cdr), _cdr_(cdr));
+        cdr = eval(Fcar(cdr), local_env);
+        return _macroexpand_(Fcar(cdr), Fcdr(cdr));
       } else if (MACROP(car)) {
         Sexp *expand = _macroexpand_(car, cdr);
         printf("macro expand as: %s\n", sexp_to_string(expand));
         return eval(expand, local_env);
       }
       else if (!strcmp(car_str, "read")) {
-        return _read_(sexp_to_string(_car_(cdr)));
+        return _read_(sexp_to_string(Fcar(cdr)));
       } else if (!strcmp(car_str, "eval")) {
-        return eval(_car_(cdr), local_env);
+        return eval(Fcar(cdr), local_env);
       }
     }
     return sexp;
@@ -340,16 +338,16 @@ Sexp *fn_call(Sexp *fn, Sexp *args) {
   Sexp *local_env = copy_sexp(env);
   Sexp *arg_list = (_nth_(1, fn));
   Sexp *val_list = args;
-  Sexp *body_list = _car_(_cdr_(_cdr_(fn)));
+  Sexp *body_list = Fcar(Fcdr(Fcdr(fn)));
   Sexp *car1, *cdr1, *car2, *cdr2;
   do {
-    car1 = _car_(arg_list);
-    cdr1 = _cdr_(arg_list);
-    car2 = _car_(val_list);
-    cdr2 = _cdr_(val_list);
-    printf("==================== local_env before: "); print(local_env);
-    local_env = _cons_(_cons_(car1, _eval_(car2)), local_env);
-    printf("==================== local_env after:  "); print(local_env);
+    car1 = Fcar(arg_list);
+    cdr1 = Fcdr(arg_list);
+    car2 = Fcar(val_list);
+    cdr2 = Fcdr(val_list);
+    PRINT(local_env);
+    local_env = Fcons(Fcons(car1, _eval_(car2)), local_env);
+    PRINT(local_env);
 
   } while (!NILP(cdr1) && !NILP(cdr2));
   return eval(body_list, local_env);
@@ -359,31 +357,30 @@ Sexp *_macroexpand_(Sexp *macro, Sexp *args) {
   Sexp *local_env = copy_sexp(env);
   Sexp *arg_list = (_nth_(1, macro));
   Sexp *val_list = args;
-  Sexp *body_list = _car_(_cdr_(_cdr_(macro)));
+  Sexp *body_list = Fcar(Fcdr(Fcdr(macro)));
   Sexp *car1, *cdr1, *car2, *cdr2;
   do {
-    car1 = _car_(arg_list);
-    cdr1 = _cdr_(arg_list);
-    car2 = _car_(val_list);
-    cdr2 = _cdr_(val_list);
-    printf("==================== local_env before: "); print(local_env);
-    local_env = _cons_(_cons_(car1, car2), local_env);
-    printf("==================== local_env after:  "); print(local_env);
-
+    car1 = Fcar(arg_list);
+    cdr1 = Fcdr(arg_list);
+    car2 = Fcar(val_list);
+    cdr2 = Fcdr(val_list);
+    PRINT(local_env);
+    local_env = Fcons(Fcons(car1, car2), local_env);
+    PRINT(local_env);
   } while (!NILP(cdr1) && !NILP(cdr2));
-  printf("body_list: "); print(body_list);
+  PRINT(body_list);
   return eval(body_list, local_env);
 }
 
 Sexp *_assoc_(Sexp *key, Sexp *pair) {
-  Sexp *car = _car_(pair);
-  Sexp *cdr = _cdr_(pair);
+  Sexp *car = Fcar(pair);
+  Sexp *cdr = Fcdr(pair);
   if (NILP(key))  return Qnil;
   if (NILP(pair)) return Qunbound;
-  if (!NILP(_eq_(_car_(car), key))) {
-    return _cdr_(car);
+  if (!NILP(Feq(Fcar(car), key))) {
+    return Fcdr(car);
   } else {
-    return _assoc_(key, _cdr_(pair));
+    return _assoc_(key, Fcdr(pair));
   }
 }
 
@@ -404,8 +401,8 @@ void init_env() {
   for (i = 0; i < 3; ++i) {
     key = make_atom(keys[i]);
     val = make_atom(vals[i]);
-    pair = _cons_(key, val);
-    env = _cons_(pair, env);
+    pair = Fcons(key, val);
+    env = Fcons(pair, env);
   }
 }
 
