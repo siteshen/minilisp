@@ -6,7 +6,7 @@
 
 #include "lisp.h"
 
-#define PRINT(sexp) printf("[sexp]: %s\n", sexp_to_string(sexp));
+#define PRINT(sexp) printf(#sexp ": %s\n", sexp_to_string(sexp));
 
 char *sub_str(char *str, int beg, int end) {
   char *new_str;
@@ -231,11 +231,16 @@ DEFUN (atom, 1, 1) (Lisp_Object sexp) {
   }
 }
 
+DEFUN (def, 2, 2) (Lisp_Object sexp1, Lisp_Object sexp2) {
+  env = Fcons(Fcons(sexp1, sexp2), env);
+  return sexp1;
+}
+
 Sexp *_read_(char *str) {
   return read_sexp(str);
 }
 
-Sexp *_nth_(int n, Lisp_Object sexp) {
+Sexp *nth(int n, Lisp_Object sexp) {
   while (n > 0 && !NILP(sexp)) {
     sexp = Fcdr(sexp);
     n--;
@@ -283,60 +288,65 @@ Sexp *eval(Sexp *sexp, Sexp *local_env) {
     car = Fcar(sexp);
     cdr = Fcdr(sexp);
 
-    if (Fatom(car)) {
+    PRINT(car);
+    PRINT(cdr);
+    if (!NILP(Fatom(car))) {
       car_str = sexp_to_string(car);
       if (!strcmp(car_str, "quote")) {
         return Fcar(cdr);
       } else if (!strcmp(car_str, "atom")) {
-        return Fatom(eval(Fcar(cdr), local_env));
+        return Fatom(eval(nth(1, sexp), local_env));
       } else if (!strcmp(car_str, "eq")) {
-        return Feq(eval(Fcar(cdr), local_env),
-                   eval(Fcar(Fcdr(cdr)), local_env));
+        return Feq(eval(nth(1, sexp), local_env),
+                   eval(nth(2, sexp), local_env));
       } else if (!strcmp(car_str, "car")) {
-        return Fcar(eval(Fcar(cdr), local_env));
+        return Fcar(eval(nth(1, sexp), local_env));
       } else if (!strcmp(car_str, "cdr")) {
-        return Fcdr(eval(Fcar(cdr), local_env));
+        return Fcdr(eval(nth(1, sexp), local_env));
       } else if (!strcmp(car_str, "cons")) {
-        return Fcons(eval(Fcar(cdr), local_env),
-                     eval(Fcar(Fcdr(cdr)), local_env));
+        return Fcons(eval(nth(1, sexp), local_env),
+                     eval(nth(2, sexp), local_env));
       } else if (!strcmp(car_str, "if")) {
-        return F_if(Fcar(cdr),
-                    eval(Fcar(Fcdr(cdr)), local_env),
-                    eval(Fcar(Fcdr(Fcdr(cdr))), local_env));
+        return F_if(eval(nth(1, sexp), local_env),
+                    eval(nth(2, sexp), local_env),
+                    eval(nth(3, sexp), local_env));
       } else if (!strcmp(car_str, "def")) {
-        key = Fcar(cdr);
-        val = eval(Fcar(Fcdr(cdr)), local_env);
-        env = Fcons(Fcons(key, val), env);
-        return key;
+        return Fdef(nth(1, sexp),
+                    eval(nth(2, sexp), local_env));
       } else if (!strcmp(car_str, "lambda")) {
         return sexp;
-      } else if (LAMBDAP(car)) {
-        return fn_call(car, cdr);
       } else if (!strcmp(car_str, "macro")) {
         return sexp;
       } else if (!strcmp(car_str, "macroexpand")) {
         cdr = eval(Fcar(cdr), local_env);
         return _macroexpand_(Fcar(cdr), Fcdr(cdr));
-      } else if (MACROP(car)) {
+      } else if (!strcmp(car_str, "read")) {
+        return _read_(sexp_to_string(Fcar(cdr)));
+      } else if (!strcmp(car_str, "eval")) {
+        return eval(nth(1, sexp), local_env);
+      } else if (!strcmp(car_str, "unbound")) {
+        return Qerror;
+      } else {
+        car = eval(car, local_env);
+        return eval(Fcons(car, cdr), local_env);
+      }
+    } else {                                    /* car is a cons, eval it first */
+      if (LAMBDAP(car)) {                       /* lambda */
+        return fn_call(car, cdr);
+      } else if (MACROP(car)) {                 /* macro */
         Sexp *expand = _macroexpand_(car, cdr);
         printf("macro expand as: %s\n", sexp_to_string(expand));
         return eval(expand, local_env);
       }
-      else if (!strcmp(car_str, "read")) {
-        return _read_(sexp_to_string(Fcar(cdr)));
-      } else if (!strcmp(car_str, "eval")) {
-        return eval(Fcar(cdr), local_env);
-      }
     }
-    return sexp;
-  default  : return sexp;
+  default  : return Qerror;
   }
 }
 
 /* ((lambda (x y) (+ x y)) 12 34) */
 Sexp *fn_call(Sexp *fn, Sexp *args) {
   Sexp *local_env = copy_sexp(env);
-  Sexp *arg_list = (_nth_(1, fn));
+  Sexp *arg_list = (nth(1, fn));
   Sexp *val_list = args;
   Sexp *body_list = Fcar(Fcdr(Fcdr(fn)));
   Sexp *car1, *cdr1, *car2, *cdr2;
@@ -345,17 +355,16 @@ Sexp *fn_call(Sexp *fn, Sexp *args) {
     cdr1 = Fcdr(arg_list);
     car2 = Fcar(val_list);
     cdr2 = Fcdr(val_list);
-    PRINT(local_env);
+    PRINT(("before fn_call", local_env));
     local_env = Fcons(Fcons(car1, _eval_(car2)), local_env);
-    PRINT(local_env);
-
+    PRINT(("after  fn call", local_env));
   } while (!NILP(cdr1) && !NILP(cdr2));
   return eval(body_list, local_env);
 }
 
 Sexp *_macroexpand_(Sexp *macro, Sexp *args) {
   Sexp *local_env = copy_sexp(env);
-  Sexp *arg_list = (_nth_(1, macro));
+  Sexp *arg_list = (nth(1, macro));
   Sexp *val_list = args;
   Sexp *body_list = Fcar(Fcdr(Fcdr(macro)));
   Sexp *car1, *cdr1, *car2, *cdr2;
@@ -364,9 +373,8 @@ Sexp *_macroexpand_(Sexp *macro, Sexp *args) {
     cdr1 = Fcdr(arg_list);
     car2 = Fcar(val_list);
     cdr2 = Fcdr(val_list);
-    PRINT(local_env);
+    PRINT(("before macroexpand", local_env));
     local_env = Fcons(Fcons(car1, car2), local_env);
-    PRINT(local_env);
   } while (!NILP(cdr1) && !NILP(cdr2));
   PRINT(body_list);
   return eval(body_list, local_env);
@@ -397,6 +405,7 @@ void init_env() {
   Qnil = make_atom("nil");
   Qt = make_atom("t");
   Qquote = make_atom("quote");
+  Qerror = make_atom("error");
 
   for (i = 0; i < 3; ++i) {
     key = make_atom(keys[i]);

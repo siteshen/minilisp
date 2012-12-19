@@ -44,7 +44,7 @@ Sexp *eval(Sexp *sexp, Sexp *env);
 Sexp *_assoc_(Sexp *key, Sexp *pair);
 
 
-static Sexp *Qnil, *Qt, *Qquote, *Qunbound;
+static Sexp *Qnil, *Qt, *Qquote, *Qunbound, *Qerror;
 
 int NILP(Sexp *sexp);
 int LAMBDAP(Sexp *sexp);
